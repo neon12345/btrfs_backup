@@ -73,11 +73,11 @@ MIRROR_TOP="$MIRROR_DIR/top"
 TOP_FILE=$(basename $(readlink "$TARGET_TOP" 2>/dev/null) 2>/dev/null)
 TARGET_TOP_REAL="$TARGET_DIR/$TOP_FILE"
 MIRROR_TOP_REAL="$MIRROR_DIR/$TOP_FILE"
-SCRUB_INFO=$(btrfs scrub status "$BTRFS_TARGET")
+SCRUB_INFO=$(btrfs scrub status "$1" | grep start | sed 's/[^:]*\://')
 if [[ ! $? -eq 0 ]]; then
     exit 1
 fi
-SCRUB_TIME=$(date -ud "$(echo $SCRUB_INFO | grep start | sed 's/[^:]*\://')" +"%s")
+SCRUB_TIME=$(date -ud "$SCRUB_INFO" +"%s")
 
 CURRENT_DATE=$(date "+%s")
 
