@@ -2,13 +2,14 @@
 
 usage: ./backup.sh btrfs_root_main btrfs_root_mirror
 
-This script will create snapshots in btrfs_root_main/$BACKUP_DIR and incrementally copy them to btrfs_root_mirror/$BACKUP_DIR. A btrfs scrub is done when the current time is $SCRUB_DAYS past the last completed scrub, but only if any scrub was ever done on the main drive. (The scrub status is available)
+This script will create snapshots in btrfs_root_main/$BACKUP_DIR and incrementally copy them to btrfs_root_mirror/$BACKUP_DIR. A btrfs scrub is done when the current time is $SCRUB_DAYS past the last completed scrub, but only if any scrub was ever done on the main drive (The scrub status is available).
 The cleanup algorithm will remove old snapshots but keep snapshots from:
 * all $KEEP_LAST days below the current time
 * one per day for $KEEP_DAY days below the current time
 * one per week for $KEEP_WEEK weeks below the current time
 * one per month for $KEEP_MONTH months below the current time
 * one for every year
+
 The cleanup will exit when snapshot dates from the future are discovered.
 
 when to use:
