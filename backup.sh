@@ -275,15 +275,15 @@ if [[ "$TOP_FILE" == "$FILE" ]]; then
     exit 1
 fi
 
-# add a new snapshot
-btrfs -q subvolume snapshot -r "$BTRFS_TARGET" "$TARGET_FILE" || exit 1
-
 # do a scrub of main and backup disk
 SCRUB_TIME=$(date_current_ts "$SCRUB_DAYS days" $SCRUB_TIME)
 if (( CURRENT_TS >= SCRUB_TIME )); then
     btrfs scrub start -B "$BTRFS_TARGET" || exit 1
     btrfs scrub start -B "$BTRFS_MIRROR" || exit 1
 fi
+
+# add a new snapshot
+btrfs -q subvolume snapshot -r "$BTRFS_TARGET" "$TARGET_FILE" || exit 1
 
 # send/receive the newly created snapshot to backup disk(s)
 if [[ -n "$TOP_FILE" ]]; then
