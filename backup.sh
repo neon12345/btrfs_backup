@@ -270,6 +270,29 @@ function find_remove() {
     done
 }
 
+do_scrub() {
+    TARGET="$1"
+    SCRUB_STATE=$(btrfs scrub status "$TARGET" | grep Status: | sed 's/[^:]*\://' | tr -d '[:space:]')
+    case $SCRUB_STATE in
+        running)
+        btrfs scrub cancel "$TARGET" && btrfs scrub resume -B "$TARGET"
+        ;;
+
+        interrupted|aborted)
+        btrfs scrub resume -B "$TARGET"
+        ;;
+
+        finished)
+        btrfs scrub start -B "$TARGET"
+        ;;
+
+       *)
+       exit 1
+       ;;
+    esac
+    exit $?
+}
+
 if [[ "$TOP_FILE" == "$FILE" ]]; then
     err "$FILE exists, try later."
     exit 1
@@ -278,8 +301,18 @@ fi
 # do a scrub of main and backup disk
 SCRUB_TIME=$(date_current_ts "$SCRUB_DAYS days" $SCRUB_TIME)
 if (( CURRENT_TS >= SCRUB_TIME )); then
-    btrfs scrub start -B "$BTRFS_TARGET" || exit 1
-    btrfs scrub start -B "$BTRFS_MIRROR" || exit 1
+    scrub_pids=()
+    do_scrub "$BTRFS_TARGET" &
+    scrub_pids+=($!)
+    do_scrub "$BTRFS_MIRROR" &
+    scrub_pids+=($!)
+
+    for pid in "${scrub_pids[@]}"; do
+        wait "$pid"
+        if [[ ! $? -eq 0 ]]; then
+            exit 1
+        fi
+    done
 fi
 
 # add a new snapshot
