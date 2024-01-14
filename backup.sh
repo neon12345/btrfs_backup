@@ -273,6 +273,11 @@ function find_remove() {
 do_scrub() {
     TARGET="$1"
     SCRUB_STATE=$(btrfs scrub status "$TARGET" | grep Status: | sed 's/[^:]*\://' | tr -d '[:space:]')
+    SCRUB_ERR=$(test -z "$(btrfs scrub status $TARGET | grep 'no errors found')" && echo "true" || echo "false")
+    if [[ "$SCRUB_ERR" == "true" ]]; then
+        echo "scrub error: $TARGET"
+        exit 1
+    fi
     case $SCRUB_STATE in
         running)
         btrfs scrub cancel "$TARGET" && btrfs scrub resume -B "$TARGET"
