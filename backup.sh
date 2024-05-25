@@ -18,7 +18,7 @@
 # AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-# usage: ./backup.sh btrfs_root_main btrfs_root_mirror
+# usage: ./backup.sh btrfs_root_main btrfs_root_mirror [force_scrub]
 # This script will create snapshots in btrfs_root_main/$BACKUP_DIR
 # and incrementally copy them to btrfs_root_mirror/$BACKUP_DIR.
 # A btrfs scrub is done when the current time is $SCRUB_DAYS past the
@@ -57,6 +57,7 @@ PROC=$$
 
 BTRFS_TARGET="$1"
 BTRFS_MIRROR="$2"
+SCRUB_FORCE="$3"
 
 # user options
 KEEP_LAST=2
@@ -310,7 +311,7 @@ fi
 
 # do a scrub of main and backup disk
 SCRUB_TIME=$(date_current_ts "$SCRUB_DAYS days" $SCRUB_TIME)
-if (( CURRENT_TS >= SCRUB_TIME )); then
+if (( CURRENT_TS >= SCRUB_TIME )) || [[ -n "$SCRUB_FORCE" ]]; then
     scrub_pids=()
     do_scrub "$BTRFS_TARGET" &
     scrub_pids+=($!)
