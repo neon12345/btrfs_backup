@@ -278,6 +278,7 @@ do_scrub() {
         echo "scrub error: $TARGET"
         exit 1
     fi
+
     case $SCRUB_STATE in
         running)
         btrfs scrub cancel "$TARGET" && btrfs scrub resume -B "$TARGET"
@@ -292,6 +293,10 @@ do_scrub() {
         ;;
 
        *)
+       if [[ -z "${SCRUB_STATE//[[:space:]]/}" ]]; then
+           SCRUB_STATE="none"
+       fi
+       echo "unknown scrub state: $SCRUB_STATE for $TARGET"
        exit 1
        ;;
     esac
