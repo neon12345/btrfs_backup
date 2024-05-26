@@ -74,11 +74,6 @@ MIRROR_TOP="$MIRROR_DIR/top"
 TOP_FILE=$(basename $(readlink "$TARGET_TOP" 2>/dev/null) 2>/dev/null)
 TARGET_TOP_REAL="$TARGET_DIR/$TOP_FILE"
 MIRROR_TOP_REAL="$MIRROR_DIR/$TOP_FILE"
-SCRUB_INFO=$(btrfs scrub status "$BTRFS_TARGET" | grep -E "^Scrub (start|resume)" | sed 's/[^:]*\://')
-if [[ ! $? -eq 0 ]]; then
-    SCRUB_INFO="1970-01-1 00:00:00"
-fi
-SCRUB_TIME=$(date -ud "$SCRUB_INFO" +"%s")
 
 CURRENT_DATE=$(date "+%s")
 
@@ -273,6 +268,10 @@ function find_remove() {
 
 do_scrub() {
     TARGET="$1"
+    CURRENT_TS="$2"
+    SCRUB_DAYS="$3"
+    SCRUB_FORCE="$4"
+    
     SCRUB_STATE=$(btrfs scrub status "$TARGET" | grep Status: | sed 's/[^:]*\://' | tr -d '[:space:]')
     SCRUB_ERR=$(test -z "$(btrfs scrub status $TARGET | grep 'no errors found')" && echo "true" || echo "false")
     if [[ "$SCRUB_ERR" == "true" ]]; then
@@ -280,28 +279,37 @@ do_scrub() {
         exit 1
     fi
 
-    case $SCRUB_STATE in
-        running)
-        btrfs scrub cancel "$TARGET" && btrfs scrub resume -B "$TARGET"
-        ;;
+    SCRUB_INFO=$(btrfs scrub status "$TARGET" | grep -E "^Scrub (start|resume)" | sed 's/[^:]*\://')
+    if [[ ! $? -eq 0 ]]; then
+        SCRUB_INFO="1970-01-1 00:00:00"
+    fi
+    SCRUB_TIME=$(date -ud "$SCRUB_INFO" +"%s")
+    SCRUB_TIME=$(date_current_ts "$SCRUB_DAYS days" $SCRUB_TIME)
 
-        interrupted|aborted)
-        btrfs scrub resume -B "$TARGET"
-        ;;
-
-        finished)
-        btrfs scrub start -B "$TARGET"
-        ;;
-
-       *)
-       if [[ -z "${SCRUB_STATE//[[:space:]]/}" ]]; then
-           SCRUB_STATE="none"
-       fi
-       echo "unknown scrub state: $SCRUB_STATE for $TARGET"
-       exit 1
-       ;;
-    esac
-    exit $?
+    if (( CURRENT_TS >= SCRUB_TIME )) || [[ -n "$SCRUB_FORCE" ]]; then
+        case $SCRUB_STATE in
+            running)
+            btrfs scrub cancel "$TARGET" && btrfs scrub resume -B "$TARGET"
+            ;;
+    
+            interrupted|aborted)
+            btrfs scrub resume -B "$TARGET"
+            ;;
+    
+            finished)
+            btrfs scrub start -B "$TARGET"
+            ;;
+    
+           *)
+           if [[ -z "${SCRUB_STATE//[[:space:]]/}" ]]; then
+               SCRUB_STATE="none"
+           fi
+           echo "unknown scrub state: $SCRUB_STATE for $TARGET"
+           exit 1
+           ;;
+        esac
+        exit $?
+    fi
 }
 
 if [[ "$TOP_FILE" == "$FILE" ]]; then
@@ -310,21 +318,18 @@ if [[ "$TOP_FILE" == "$FILE" ]]; then
 fi
 
 # do a scrub of main and backup disk
-SCRUB_TIME=$(date_current_ts "$SCRUB_DAYS days" $SCRUB_TIME)
-if (( CURRENT_TS >= SCRUB_TIME )) || [[ -n "$SCRUB_FORCE" ]]; then
-    scrub_pids=()
-    do_scrub "$BTRFS_TARGET" &
-    scrub_pids+=($!)
-    do_scrub "$BTRFS_MIRROR" &
-    scrub_pids+=($!)
+scrub_pids=()
+do_scrub "$BTRFS_TARGET" "$CURRENT_TS" "$SCRUB_DAYS" "$SCRUB_FORCE" &
+scrub_pids+=($!)
+do_scrub "$BTRFS_MIRROR" "$CURRENT_TS" "$SCRUB_DAYS" "$SCRUB_FORCE" &
+scrub_pids+=($!)
 
-    for pid in "${scrub_pids[@]}"; do
-        wait "$pid"
-        if [[ ! $? -eq 0 ]]; then
-            exit 1
-        fi
-    done
-fi
+for pid in "${scrub_pids[@]}"; do
+    wait "$pid"
+    if [[ ! $? -eq 0 ]]; then
+        exit 1
+    fi
+done
 
 # add a new snapshot
 btrfs -q subvolume snapshot -r "$BTRFS_TARGET" "$TARGET_FILE" || exit 1
