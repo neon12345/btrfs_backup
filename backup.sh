@@ -74,7 +74,7 @@ MIRROR_TOP="$MIRROR_DIR/top"
 TOP_FILE=$(basename $(readlink "$TARGET_TOP" 2>/dev/null) 2>/dev/null)
 TARGET_TOP_REAL="$TARGET_DIR/$TOP_FILE"
 MIRROR_TOP_REAL="$MIRROR_DIR/$TOP_FILE"
-SCRUB_INFO=$(btrfs scrub status "$BTRFS_TARGET" | grep start | sed 's/[^:]*\://')
+SCRUB_INFO=$(btrfs scrub status "$BTRFS_TARGET" | grep -E "^Scrub (start|resume)" | sed 's/[^:]*\://')
 if [[ ! $? -eq 0 ]]; then
     SCRUB_INFO="1970-01-1 00:00:00"
 fi
